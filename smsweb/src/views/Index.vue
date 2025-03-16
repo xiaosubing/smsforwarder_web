@@ -38,7 +38,7 @@
           <div class="form-group">
             <label>发送给：</label>
             <input
-                type="text"
+                v-model="sendMessagePhone"
                 placeholder="10010"
                 required
             >
@@ -46,7 +46,7 @@
           <div class="form-group">
             <label>短信内容：</label>
             <textarea
-                v-model="messageData.content"
+                v-model="sendMessgeContent"
                 placeholder="请输入短信内容..."
                 required
             ></textarea>
@@ -56,6 +56,17 @@
             <button type="submit">确认发送</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ▋短信发送成功弹窗 -->
+    <div v-if="sendMessageSuccess" class="success-dialog">
+      <div class="dialog-content">
+        <h3>发送成功</h3>
+        <p>短信已成功发送到目标号码。</p>
+        <div class="button-group">
+          <button @click="closeSendMessageSuccess">确认</button>
+        </div>
       </div>
     </div>
 
@@ -73,8 +84,8 @@
             </tr>
             </thead>
             <tbody>
-            <tr v-for="(msg, index) in messages" :key="index">
-              <td>{{ formatPhoneNumber(msg.sender) }}</td>
+            <tr v-for="(msg, index) in getMessagesData" :key="index">
+              <td>{{ msg.sender  }}</td>
               <td class="message-content">{{ msg.content }}</td>
             </tr>
             </tbody>
@@ -100,14 +111,18 @@ const focused = ref(null)
 const selectedNumbers = ref(new Set())
 const phoneNumbers = ref([])
 const isLoading = ref(false)
+const sendMessagePhone = ref([])
+let getMessagesData = ref([{
+  "sender": '',
+  "content": "",
+}])
 
 // ▋短信相关状态
 const showMessageDialog = ref(false)
 const selectedRecipient = ref('')
-const messageData = ref({
-  recipient: '',
-  content: ''
-})
+const sendMessgeContent = ref([])
+// ▋短信发送成功状态
+const sendMessageSuccess = ref(false)
 
 
 onMounted(() => {
@@ -152,7 +167,7 @@ const messages = ref([]);
 const getMessage = async (num) => {
   try {
     const response = await requests.post('/api/getMessages');
-    messages.value = response.data;
+    getMessagesData = response.data
   } catch (error) {
     console.error('请求出错:', error);
   }
@@ -162,20 +177,41 @@ const getMessage = async (num) => {
 
 // ▋确认发送短信
 const confirmSend = async () => {
-  console.log('发送短信:', messageData.value)
+  if (!sendMessagePhone.value.trim()) {
+    message.value = '电话号码不能为空。';
+    return;
+  }
+  if (!/^\d+$/.test(sendMessagePhone.value)) {
+    message.value = '请输入有效的数字电话号码。';
+    return;
+  }
+  const sendMessageData = {
+    "phone": sendMessagePhone.value,
+    "content": sendMessgeContent.value,
+  }
+
   try {
-    const response = await requests.post('/api/sendMessages', messageData.value)
+    const response = await requests.post('/api/sendMessages', sendMessageData);
     messages.value = response.value
+    if (response.status === 200) {
+      console.log("发送成功")
+      sendMessageSuccess.value = true
+    }
     // 发送成功后清空短信内容
+    sendMessagePhone.value = ''
+    sendMessgeContent.value = ''
   }catch (error) {
     console.error('请求出错:', error);
   }
 }
 
+const closeSendMessageSuccess = () =>{
+  sendMessageSuccess.value = false
+}
 // ▋取消发送
 const cancelSend = () => {
   showMessageDialog.value = false
-  messageData.value.content = ''
+  // messageData.value.content = ''
 }
 </script>
 
@@ -386,4 +422,19 @@ th {
     font-size: 0.9em;
   }
 }
+
+/* ▋短信发送成功弹窗样式 */
+.success-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* 确保在最上层 */
+}
+
 </style>
